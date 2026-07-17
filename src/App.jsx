@@ -9,11 +9,16 @@ function App() {
   const [joinId, setJoinId] = useState('');
   const [status, setStatus] = useState('disconnected');
   const [error, setError] = useState('');
+  const [emojis, setEmojis] = useState([]);
   
   const peerInstance = useRef(null);
   const streamRef = useRef(null);
   const videoRef = useRef(null);
-  const emptyStreamRef = useRef(null); // Used to initialize call without mic
+  
+  // Ref to hold the active data connection for a viewer
+  const dataConnRef = useRef(null);
+  // Ref to hold all active connections for the host
+  const activeConnections = useRef([]);
 
   useEffect(() => {
     return () => {
@@ -26,22 +31,31 @@ function App() {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-    if (emptyStreamRef.current) {
-      emptyStreamRef.current.getTracks().forEach(track => track.stop());
-      emptyStreamRef.current = null;
-    }
     if (peerInstance.current) {
       peerInstance.current.destroy();
       peerInstance.current = null;
     }
+    dataConnRef.current = null;
+    activeConnections.current = [];
     setStatus('disconnected');
     setError('');
     setPeerId('');
+    setEmojis([]);
+  };
+
+  const triggerEmoji = (char) => {
+    const id = Date.now() + Math.random();
+    const x = Math.floor(Math.random() * 80) + 10; // X position 10% to 90%
+    setEmojis(prev => [...prev, { id, char, x }]);
+    
+    // Remove from state after animation completes
+    setTimeout(() => {
+      setEmojis(prev => prev.filter(e => e.id !== id));
+    }, 3000);
   };
 
   const initPeer = (id = null) => {
     return new Promise((resolve, reject) => {
-      // Use PeerJS default public server
       const peer = new Peer(id);
       
       peer.on('open', (id) => {
@@ -83,9 +97,27 @@ function App() {
 
       const peer = await initPeer();
       
-      // When a viewer connects via data connection, call them with our media stream
+      // When a viewer connects via data connection
       peer.on('connection', (conn) => {
-        // Wait briefly to ensure they are ready to receive the call
+        activeConnections.current.push(conn);
+        
+        conn.on('data', (data) => {
+          if (data && data.type === 'emoji') {
+            triggerEmoji(data.emoji);
+            // Broadcast to all OTHER viewers
+            activeConnections.current.forEach(c => {
+              if (c !== conn && c.open) {
+                c.send(data);
+              }
+            });
+          }
+        });
+
+        conn.on('close', () => {
+          activeConnections.current = activeConnections.current.filter(c => c !== conn);
+        });
+
+        // Call them with our media stream
         setTimeout(() => {
           peer.call(conn.peer, streamRef.current);
         }, 500);
@@ -110,12 +142,19 @@ function App() {
 
       const peer = await initPeer();
 
-      // Connect to the host using a DataConnection to trigger the host to call us
+      // Connect to the host using a DataConnection
       const conn = peer.connect(joinId.trim());
+      dataConnRef.current = conn;
       
       conn.on('error', (err) => {
         setError('Connection failed: ' + err.message);
         setStatus('error');
+      });
+
+      conn.on('data', (data) => {
+        if (data && data.type === 'emoji') {
+          triggerEmoji(data.emoji);
+        }
       });
 
       // The host will call us back with their stream
@@ -158,6 +197,13 @@ function App() {
 
   const copyId = () => {
     navigator.clipboard.writeText(peerId);
+  };
+
+  const sendEmoji = (emo) => {
+    triggerEmoji(emo);
+    if (dataConnRef.current && dataConnRef.current.open) {
+      dataConnRef.current.send({ type: 'emoji', emoji: emo });
+    }
   };
 
   return (
@@ -227,6 +273,15 @@ function App() {
           <div className="video-container">
             <video ref={videoRef} autoPlay playsInline muted style={{ display: status === 'connected' ? 'block' : 'none' }}></video>
             
+            {/* Emojis Overlay */}
+            <div className="emoji-overlay">
+              {emojis.map(e => (
+                <div key={e.id} className="floating-emoji" style={{ left: `${e.x}%` }}>
+                  {e.char}
+                </div>
+              ))}
+            </div>
+
             {status !== 'connected' && !error && (
               <div className="center-layout" style={{ position: 'absolute', inset: 0 }}>
                 <Loader2 size={48} color="var(--primary)" className="pulse" />
@@ -273,10 +328,17 @@ function App() {
           </div>
 
           <div className="video-container">
-            {/* Viewer video must NOT be muted by default to hear host audio! However, some browsers require interaction to play audio. 
-                Using controls allows the user to unmute/play if autoplay policy blocks it. */}
             <video ref={videoRef} autoPlay playsInline controls style={{ display: status === 'connected' ? 'block' : 'none' }}></video>
             
+            {/* Emojis Overlay */}
+            <div className="emoji-overlay">
+              {emojis.map(e => (
+                <div key={e.id} className="floating-emoji" style={{ left: `${e.x}%` }}>
+                  {e.char}
+                </div>
+              ))}
+            </div>
+
             {status === 'connecting' && (
               <div className="center-layout" style={{ position: 'absolute', inset: 0 }}>
                 <Loader2 size={48} color="var(--primary)" className="pulse" />
@@ -293,6 +355,16 @@ function App() {
               </div>
             )}
           </div>
+          
+          {status === 'connected' && (
+            <div className="emoji-bar animate-fade-in">
+              {['❤️', '👍', '😂', '🎉', '🔥'].map(emo => (
+                <button key={emo} className="emoji-btn" onClick={() => sendEmoji(emo)}>
+                  {emo}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
