@@ -313,7 +313,7 @@ function App() {
               <p style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>You are sharing your screen. Others can join with your Room ID.</p>
               
               <div className="emoji-bar animate-fade-in" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-                {['❤️', '👍', '😂', '🎉', '🔥'].map(emo => (
+                {['❤️', '👍', '😂', '🎉', '🔥', '😱', '👻'].map(emo => (
                   <button key={emo} className="emoji-btn" onClick={() => {
                      triggerEmoji(emo);
                      // Broadcast host emoji to all viewers
@@ -379,7 +379,7 @@ function App() {
           
           {status === 'connected' && (
             <div className="emoji-bar animate-fade-in">
-              {['❤️', '👍', '😂', '🎉', '🔥'].map(emo => (
+              {['❤️', '👍', '😂', '🎉', '🔥', '😱', '👻'].map(emo => (
                 <button key={emo} className="emoji-btn" onClick={() => sendEmoji(emo)}>
                   {emo}
                 </button>
