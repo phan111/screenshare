@@ -305,7 +305,22 @@ function App() {
                 <div className="pulse"></div> Live
               </div>
               <p style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>You are sharing your screen. Others can join with your Room ID.</p>
-              <button className="btn btn-danger" style={{ marginTop: '1.5rem' }} onClick={() => { cleanup(); setView('home'); }}>
+              
+              <div className="emoji-bar animate-fade-in" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+                {['❤️', '👍', '😂', '🎉', '🔥'].map(emo => (
+                  <button key={emo} className="emoji-btn" onClick={() => {
+                     triggerEmoji(emo);
+                     // Broadcast host emoji to all viewers
+                     activeConnections.current.forEach(c => {
+                       if (c.open) c.send({ type: 'emoji', emoji: emo });
+                     });
+                  }}>
+                    {emo}
+                  </button>
+                ))}
+              </div>
+
+              <button className="btn btn-danger" onClick={() => { cleanup(); setView('home'); }}>
                 Stop Sharing
               </button>
             </div>
