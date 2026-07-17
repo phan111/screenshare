@@ -73,27 +73,20 @@ function App() {
     });
   };
 
-  const startHosting = async (sourceType = 'screen') => {
+  const startHosting = async () => {
     try {
       setStatus('connecting');
       setView('host');
       setError('');
 
-      let stream;
-      if (sourceType === 'screen') {
-        if (!navigator.mediaDevices.getDisplayMedia) {
-          throw new Error('Screen sharing is not supported on mobile browsers. Please use "Share Camera" instead!');
-        }
-        stream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
-          audio: true
-        });
-      } else {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user' },
-          audio: true
-        });
+      if (!navigator.mediaDevices.getDisplayMedia) {
+        throw new Error('Screen sharing is not supported on mobile browsers. Please host from a Desktop computer.');
       }
+      
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true
+      });
       
       streamRef.current = stream;
       
@@ -232,15 +225,10 @@ function App() {
           <div style={{ display: 'grid', gap: '1.5rem', width: '100%' }}>
             <div className="glass-panel" style={{ padding: '1.5rem', background: 'rgba(255, 255, 255, 0.03)' }}>
               <h3 style={{ marginBottom: '0.5rem' }}>Host a Session</h3>
-              <p style={{ fontSize: '0.875rem', marginBottom: '1.5rem' }}>Share your screen or camera securely via P2P.</p>
-              <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
-                <button className="btn btn-primary" onClick={() => startHosting('screen')} style={{ width: '100%' }}>
-                  <Monitor size={20} /> Share Screen
-                </button>
-                <button className="btn btn-outline" onClick={() => startHosting('camera')} style={{ width: '100%' }}>
-                  <Users size={20} /> Share Camera (Mobile)
-                </button>
-              </div>
+              <p style={{ fontSize: '0.875rem', marginBottom: '1.5rem' }}>Share your screen and audio securely via P2P.</p>
+              <button className="btn btn-primary" onClick={startHosting} style={{ width: '100%' }}>
+                <Monitor size={20} /> Start Sharing
+              </button>
             </div>
 
             <div className="glass-panel" style={{ padding: '1.5rem', background: 'rgba(255, 255, 255, 0.03)' }}>
