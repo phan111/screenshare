@@ -113,8 +113,8 @@ function App() {
           if (data && data.type === 'emoji') {
             triggerEmoji(data.emoji);
             activeConnections.current.forEach(c => {
-              if (c !== conn && c.open) {
-                c.send(data);
+              if (c !== conn) {
+                try { c.send(data); } catch(e) { console.warn(e); }
               }
             });
           }
@@ -207,8 +207,8 @@ function App() {
 
   const sendEmoji = (emo) => {
     triggerEmoji(emo);
-    if (dataConnRef.current && dataConnRef.current.open) {
-      dataConnRef.current.send({ type: 'emoji', emoji: emo });
+    if (dataConnRef.current) {
+      try { dataConnRef.current.send({ type: 'emoji', emoji: emo }); } catch(e) { console.warn(e); }
     }
   };
 
@@ -318,7 +318,7 @@ function App() {
                      triggerEmoji(emo);
                      // Broadcast host emoji to all viewers
                      activeConnections.current.forEach(c => {
-                       if (c.open) c.send({ type: 'emoji', emoji: emo });
+                       try { c.send({ type: 'emoji', emoji: emo }); } catch(e) { console.warn(e); }
                      });
                   }}>
                     {emo}
