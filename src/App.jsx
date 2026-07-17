@@ -73,23 +73,38 @@ function App() {
     });
   };
 
-  const startHosting = async () => {
+  const startHosting = async (sourceType = 'screen') => {
     try {
       setStatus('connecting');
       setView('host');
       setError('');
 
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: true
-      });
+      let stream;
+      if (sourceType === 'screen') {
+        if (!navigator.mediaDevices.getDisplayMedia) {
+          throw new Error('Screen sharing is not supported on mobile browsers. Please use "Share Camera" instead!');
+        }
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: true
+        });
+      } else {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user' },
+          audio: true
+        });
+      }
       
       streamRef.current = stream;
       
-      stream.getVideoTracks()[0].onended = () => {
-        cleanup();
-        setView('home');
-      };
+      // Stop hosting if user stops sharing via browser UI button
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.onended = () => {
+          cleanup();
+          setView('home');
+        };
+      }
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -97,14 +112,13 @@ function App() {
 
       const peer = await initPeer();
       
-      // When a viewer connects via data connection
+      // When a viewer connects via data connection, call them with our media stream
       peer.on('connection', (conn) => {
         activeConnections.current.push(conn);
         
         conn.on('data', (data) => {
           if (data && data.type === 'emoji') {
             triggerEmoji(data.emoji);
-            // Broadcast to all OTHER viewers
             activeConnections.current.forEach(c => {
               if (c !== conn && c.open) {
                 c.send(data);
@@ -117,7 +131,6 @@ function App() {
           activeConnections.current = activeConnections.current.filter(c => c !== conn);
         });
 
-        // Call them with our media stream
         setTimeout(() => {
           peer.call(conn.peer, streamRef.current);
         }, 500);
@@ -126,7 +139,7 @@ function App() {
       setStatus('connected');
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Failed to start screen share.');
+      setError(err.message || 'Failed to start media stream.');
       setStatus('error');
     }
   };
@@ -219,10 +232,15 @@ function App() {
           <div style={{ display: 'grid', gap: '1.5rem', width: '100%' }}>
             <div className="glass-panel" style={{ padding: '1.5rem', background: 'rgba(255, 255, 255, 0.03)' }}>
               <h3 style={{ marginBottom: '0.5rem' }}>Host a Session</h3>
-              <p style={{ fontSize: '0.875rem', marginBottom: '1.5rem' }}>Share your screen and audio securely via P2P.</p>
-              <button className="btn btn-primary" onClick={startHosting} style={{ width: '100%' }}>
-                <Monitor size={20} /> Start Sharing
-              </button>
+              <p style={{ fontSize: '0.875rem', marginBottom: '1.5rem' }}>Share your screen or camera securely via P2P.</p>
+              <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
+                <button className="btn btn-primary" onClick={() => startHosting('screen')} style={{ width: '100%' }}>
+                  <Monitor size={20} /> Share Screen
+                </button>
+                <button className="btn btn-outline" onClick={() => startHosting('camera')} style={{ width: '100%' }}>
+                  <Users size={20} /> Share Camera (Mobile)
+                </button>
+              </div>
             </div>
 
             <div className="glass-panel" style={{ padding: '1.5rem', background: 'rgba(255, 255, 255, 0.03)' }}>
